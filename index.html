@@ -1,0 +1,570 @@
+
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Focus Planner</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 20px;
+  background: #f1f4fa;
+  color: #222;
+  font-family: Arial, sans-serif;
+}
+
+.container { max-width: 1000px; margin: auto; }
+
+h1 {
+  text-align: center;
+  color: #635bdb;
+  margin-bottom: 24px;
+}
+
+.main {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.panel, .calendar-panel {
+  background: white;
+  padding: 22px;
+  border-radius: 18px;
+  box-shadow: 0 4px 18px #0000000c;
+}
+
+h2 { margin-top: 0; }
+
+input, button {
+  font: inherit;
+  border-radius: 8px;
+  padding: 10px;
+  border: 1px solid #ddd;
+}
+
+button {
+  cursor: pointer;
+  background: #635bdb;
+  color: white;
+  border: none;
+  margin: 4px 2px;
+}
+
+button:hover { opacity: .85; }
+
+.secondary { background: #777; }
+
+.timer-inputs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.timer-inputs input { width: 75px; }
+
+#clock {
+  font-size: 42px;
+  font-weight: bold;
+  text-align: center;
+  margin: 24px 0;
+  color: #635bdb;
+}
+
+#taskInput { width: 68%; }
+
+.task {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.task input { width: 18px; height: 18px; }
+.task span { flex: 1; overflow-wrap: anywhere; }
+.task.done span { text-decoration: line-through; color: #999; }
+.delete { background: #e55353; padding: 6px 10px; }
+
+.progress-bg {
+  height: 14px;
+  background: #eee;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+#progressBar {
+  height: 100%;
+  width: 0;
+  background: #53bd8b;
+  transition: width .2s;
+}
+
+#progressText {
+  text-align: center;
+  font-size: 24px;
+  font-weight: bold;
+  margin: 12px;
+}
+
+.calendar-panel { margin-top: 20px; }
+
+.calendar-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+#monthTitle { font-weight: bold; text-align: center; }
+
+.weekdays, .calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.weekdays div {
+  text-align: center;
+  font-size: 12px;
+  color: #777;
+  padding: 8px 0;
+}
+
+.day {
+  min-height: 68px;
+  border-radius: 9px;
+  background: #f4f5f9;
+  color: #222;
+  padding: 5px 1px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+
+.day.empty { background: transparent; }
+.day.today { outline: 2px solid #635bdb; }
+.day.selected { border: 2px solid #635bdb; }
+.day.has-data { background: #ddf7e9; }
+.day .pct { font-size: 12px; font-weight: bold; color: #16865c; }
+
+#dayDetails {
+  margin-top: 15px;
+  padding: 12px;
+  background: #f6f5ff;
+  border-radius: 10px;
+}
+
+.note { font-size: 13px; color: #666; }
+
+.modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: #0008;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 5;
+}
+
+.modal-box {
+  background: white;
+  padding: 24px;
+  border-radius: 16px;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+}
+
+.modal-box h3 { margin-top: 0; }
+.modal-box input { width: 75px; margin: 4px; }
+
+@media(max-width:700px) {
+  body { padding: 10px; }
+  .main { grid-template-columns: 1fr; }
+  #clock { font-size: 34px; }
+  .panel, .calendar-panel { padding: 15px; }
+  .day { min-height: 52px; }
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+  <h1>🎯 Focus Planner</h1>
+
+  <div class="main">
+    <section class="panel">
+      <h2>⏱️ Taymer</h2>
+
+      <div class="timer-inputs">
+        <label>Soat<br><input id="hours" type="number" min="0" value="0"></label>
+        <label>Daqiqa<br><input id="minutes" type="number" min="0" max="59" value="25"></label>
+        <label>Soniya<br><input id="seconds" type="number" min="0" max="59" value="0"></label>
+      </div>
+
+      <div id="clock">00:00:00</div>
+
+      <button onclick="startTimer()">▶ Boshlash</button>
+      <button onclick="pauseTimer()">⏸ Pauza</button>
+      <button class="secondary" onclick="resetTimer()">↺ Qayta boshlash</button>
+
+      <p class="note">Har safar sahifa ochilganda taymer 00:00:00 dan boshlanadi.</p>
+    </section>
+
+    <section class="panel">
+      <h2>📝 Vazifalar</h2>
+
+      <form id="taskForm">
+        <input id="taskInput" placeholder="Vazifani yozing..." required>
+        <button type="submit">Qo‘shish</button>
+      </form>
+
+      <div id="taskList"></div>
+
+      <h3>Bugungi natija</h3>
+      <div class="progress-bg"><div id="progressBar"></div></div>
+      <div id="progressText">0%</div>
+      <p class="note">Bajarilgan vazifalar soniga qarab foiz hisoblanadi.</p>
+    </section>
+  </div>
+
+  <section class="calendar-panel">
+    <div class="calendar-head">
+      <button onclick="changeMonth(-1)">❮</button>
+      <div id="monthTitle"></div>
+      <button onclick="changeMonth(1)">❯</button>
+    </div>
+
+    <div class="weekdays">
+      <div>Dush</div><div>Sesh</div><div>Chor</div>
+      <div>Pay</div><div>Jum</div><div>Shan</div><div>Yak</div>
+    </div>
+
+    <div id="calendarGrid" class="calendar-grid"></div>
+    <div id="dayDetails">Kunni tanlang.</div>
+    <p class="note">Yashil kunlarda saqlangan natijalar bor.</p>
+  </section>
+</div>
+
+<div class="modal" id="tasksModal">
+  <div class="modal-box">
+    <h3>🎉 Tabriklayman!</h3>
+    <p>Siz belgilangan vazifalarni tugatdingiz. Vaqt davom etsinmi yoki to‘xtasinmi?</p>
+    <button onclick="continueTimer()">Davom etsin</button>
+    <button class="secondary" onclick="stopTimer()">To‘xtasin</button>
+  </div>
+</div>
+
+<div class="modal" id="timeModal">
+  <div class="modal-box">
+    <h3>⏰ Vaqt tugadi!</h3>
+    <p>Afsuski, belgilangan vazifalarni bajara olmadingiz. Qo‘shimcha vaqt xohlaysizmi?</p>
+
+    <div>
+      <input id="extraHours" type="number" min="0" value="0" aria-label="Soat"> soat
+      <input id="extraMinutes" type="number" min="0" value="5" aria-label="Daqiqa"> daqiqa
+      <input id="extraSeconds" type="number" min="0" value="0" aria-label="Soniya"> soniya
+    </div>
+
+    <button onclick="addExtraTime()">Qo‘shimcha vaqt</button>
+    <button class="secondary" onclick="closeModal('timeModal')">Yopish</button>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+let tasks = [];
+let remaining = 0;
+let interval = null;
+let timerRunning = false;
+let tasksModalShown = false;
+
+const STORAGE_KEY = "focusPlannerDailyProgress";
+
+let dailyProgress = {};
+try {
+  dailyProgress = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+} catch {
+  dailyProgress = {};
+}
+
+const monthNames = [
+  "Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun",
+  "Iyul", "Avgust", "Sentabr", "Oktabr", "Noyabr", "Dekabr"
+];
+
+let calendarMonth = new Date();
+calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
+let selectedDate = dateKey(new Date());
+
+function dateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function formatDate(key) {
+  const [y, m, d] = key.split("-").map(Number);
+  return `${d} ${monthNames[m - 1]} ${y}`;
+}
+
+function saveDailyProgress(percent) {
+  const today = dateKey(new Date());
+  const previous = dailyProgress[today];
+
+  // Shu kungi eng yuqori foiz saqlanadi
+  if (previous === undefined || percent > previous) {
+    dailyProgress[today] = percent;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(dailyProgress));
+    } catch (error) {
+      console.warn("Natijani saqlash imkoni bo‘lmadi.", error);
+    }
+  }
+
+  renderCalendar();
+}
+
+function renderCalendar() {
+  $("monthTitle").textContent =
+    `${monthNames[calendarMonth.getMonth()]} ${calendarMonth.getFullYear()}`;
+
+  const grid = $("calendarGrid");
+  grid.innerHTML = "";
+
+  const year = calendarMonth.getFullYear();
+  const month = calendarMonth.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const offset = (firstDay.getDay() + 6) % 7;
+  const today = dateKey(new Date());
+
+  for (let i = 0; i < offset; i++) {
+    const blank = document.createElement("div");
+    blank.className = "day empty";
+    grid.appendChild(blank);
+  }
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const key = dateKey(new Date(year, month, day));
+    const cell = document.createElement("button");
+    cell.type = "button";
+    cell.className = "day";
+
+    if (key === today) cell.classList.add("today");
+    if (key === selectedDate) cell.classList.add("selected");
+
+    const hasData = Object.prototype.hasOwnProperty.call(dailyProgress, key);
+    if (hasData) cell.classList.add("has-data");
+
+    const number = document.createElement("span");
+    number.textContent = day;
+    cell.appendChild(number);
+
+    if (hasData) {
+      const pct = document.createElement("span");
+      pct.className = "pct";
+      pct.textContent = dailyProgress[key] + "%";
+      cell.appendChild(pct);
+    }
+
+    cell.addEventListener("click", () => {
+      selectedDate = key;
+      renderCalendar();
+    });
+
+    grid.appendChild(cell);
+  }
+
+  const value = dailyProgress[selectedDate];
+  $("dayDetails").textContent = value === undefined
+    ? `${formatDate(selectedDate)} — natija saqlanmagan.`
+    : `${formatDate(selectedDate)} — eng yuqori natijangiz: ${value}%.`;
+}
+
+function changeMonth(amount) {
+  calendarMonth = new Date(
+    calendarMonth.getFullYear(),
+    calendarMonth.getMonth() + amount,
+    1
+  );
+  renderCalendar();
+}
+
+function renderClock() {
+  const h = Math.floor(remaining / 3600);
+  const m = Math.floor((remaining % 3600) / 60);
+  const s = remaining % 60;
+
+  $("clock").textContent =
+    `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function readTimerInputs() {
+  const h = Math.max(0, Number($("hours").value) || 0);
+  const m = Math.max(0, Number($("minutes").value) || 0);
+  const s = Math.max(0, Number($("seconds").value) || 0);
+  return Math.floor(h * 3600 + m * 60 + s);
+}
+
+function startTimer() {
+  if (timerRunning) return;
+
+  if (remaining <= 0) remaining = readTimerInputs();
+
+  if (remaining <= 0) {
+    alert("Taymer uchun vaqt kiriting.");
+    return;
+  }
+
+  timerRunning = true;
+
+  interval = setInterval(() => {
+    remaining--;
+    renderClock();
+
+    if (remaining <= 0) {
+      pauseTimer();
+      $("timeModal").style.display = "flex";
+    }
+  }, 1000);
+}
+
+function pauseTimer() {
+  clearInterval(interval);
+  interval = null;
+  timerRunning = false;
+}
+
+function resetTimer() {
+  pauseTimer();
+  remaining = readTimerInputs();
+  renderClock();
+}
+
+function closeModal(id) {
+  $(id).style.display = "none";
+}
+
+function addExtraTime() {
+  const h = Math.max(0, Number($("extraHours").value) || 0);
+  const m = Math.max(0, Number($("extraMinutes").value) || 0);
+  const s = Math.max(0, Number($("extraSeconds").value) || 0);
+  const extra = Math.floor(h * 3600 + m * 60 + s);
+
+  if (extra <= 0) {
+    alert("Qo‘shimcha vaqtni kiriting.");
+    return;
+  }
+
+  closeModal("timeModal");
+  remaining = extra;
+  renderClock();
+  startTimer();
+}
+
+function stopTimer() {
+  pauseTimer();
+  closeModal("tasksModal");
+}
+
+function continueTimer() {
+  closeModal("tasksModal");
+  tasksModalShown = true;
+  startTimer();
+}
+
+$("taskForm").addEventListener("submit", event => {
+  event.preventDefault();
+  const text = $("taskInput").value.trim();
+  if (!text) return;
+
+  tasks.push({
+    id: Date.now() + Math.random(),
+    text,
+    done: false
+  });
+
+  $("taskInput").value = "";
+  renderTasks();
+});
+
+function toggleTask(id, checked) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+
+  task.done = checked;
+  renderTasks();
+}
+
+function deleteTask(id) {
+  tasks = tasks.filter(t => t.id !== id);
+  renderTasks();
+}
+
+function renderTasks() {
+  const list = $("taskList");
+  list.innerHTML = "";
+
+  tasks.forEach(task => {
+    const row = document.createElement("div");
+    row.className = "task" + (task.done ? " done" : "");
+
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = task.done;
+    checkbox.addEventListener("change", () =>
+      toggleTask(task.id, checkbox.checked)
+    );
+
+    const label = document.createElement("span");
+    label.textContent = task.text;
+
+    const del = document.createElement("button");
+    del.className = "delete";
+    del.textContent = "✕";
+    del.title = "Vazifani o‘chirish";
+    del.addEventListener("click", () => deleteTask(task.id));
+
+    row.append(checkbox, label, del);
+    list.appendChild(row);
+  });
+
+  const total = tasks.length;
+  const done = tasks.filter(t => t.done).length;
+  const percent = total ? Math.round(done / total * 100) : 0;
+
+  $("progressBar").style.width = percent + "%";
+  $("progressText").textContent = percent + "%";
+
+  saveDailyProgress(percent);
+
+  if (total > 0 && done === total && !tasksModalShown) {
+    tasksModalShown = true;
+    pauseTimer();
+    $("tasksModal").style.display = "flex";
+  }
+
+  if (done < total) tasksModalShown = false;
+}
+
+// Har safar sayt ochilganda taymer noldan boshlanadi.
+// Avvalgi kunlarning kalendar natijalari esa saqlanib qoladi.
+remaining = 0;
+renderClock();
+renderTasks();
+renderCalendar();
+</script>
+</body>
+</html>
